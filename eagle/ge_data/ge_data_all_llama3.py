@@ -17,7 +17,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 
-bigname = "/net/papilio/storage7/tingyuan/llama/EAGLE/base_model/Meta-Llama-3-8B-Instruct"
+bigname = "./base_model/Meta-Llama-3-8B-Instruct"
 #bigname = "/home/lyh/weights/hf/llama2chat/7B/"
 
 

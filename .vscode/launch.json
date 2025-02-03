@@ -4,21 +4,17 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            // !!! change file! change s and e for index
-            // python -m ge_data.allocation --outdir /net/papilio/storage7/tingyuan/llm_inference/eagle/eagle_new/reflectio/new_train_data/
             "name": "02_02_ge_data",
             "type": "debugpy",
             "request": "launch",
-            "program": "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/ge_data/allocation.py",
+            "program": "${workspaceFolder}/eagle/ge_data/allocation.py",
             "args": [
-                "--outdir", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/train_data"
+                "--outdir",
+                "${workspaceFolder}/eagle/reflectio/train_data"
             ],
             "console": "integratedTerminal",
-            "env": {
-    
-            },
+            "env": {}
         },
         {
             "name": "02_03_debug_train",
@@ -26,18 +22,18 @@
             "request": "launch",
             "module": "eagle.train.main",
             "args": [
-                "--tmpdir", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/train_data/",
-                "--cpdir", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/checlpoints/",
-                "--basepath", "/net/papilio/storage7/tingyuan/llama/eagle_new/base_model/Meta-Llama-3-8B-Instruct/",
-                "--configpath", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/train/eagle_new-LLaMA3-Instruct-8B.json",
+                "--tmpdir", "${workspaceFolder}/eagle/reflectio/train_data/",
+                "--cpdir", "${workspaceFolder}/eagle/reflectio/checlpoints/",
+                "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
+                "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
                 "--bs", "1"
             ],
             "env": {
-                "PYTHONPATH": "/net/papilio/storage7/tingyuan/llama/eagle_new",
+                "PYTHONPATH": "${workspaceFolder}",
                 "ACCELERATE_LAUNCH": "1",
                 "ACCELERATE_MIXED_PRECISION": "bf16"
             },
-            "cwd": "/net/papilio/storage7/tingyuan/llama/eagle_new",
+            "cwd": "${workspaceFolder}",
             "justMyCode": true
         },
         {
@@ -46,18 +42,18 @@
             "request": "launch",
             "module": "eagle.train.mainv2",
             "args": [
-                "--tmpdir", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/train_data/",
-                "--cpdir", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/checlpoints/",
-                "--basepath", "/net/papilio/storage7/tingyuan/llama/eagle_new/base_model/Meta-Llama-3-8B-Instruct/",
-                "--configpath", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/train/eagle_new-LLaMA3-Instruct-8B.json",
+                "--tmpdir", "${workspaceFolder}/eagle/reflectio/train_data/",
+                "--cpdir", "${workspaceFolder}/eagle/reflectio/checlpoints/",
+                "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
+                "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
                 "--bs", "1"
             ],
             "env": {
-                "PYTHONPATH": "/net/papilio/storage7/tingyuan/llama/eagle_new",
+                "PYTHONPATH": "${workspaceFolder}",
                 "ACCELERATE_LAUNCH": "1",
                 "ACCELERATE_MIXED_PRECISION": "bf16"
             },
-            "cwd": "/net/papilio/storage7/tingyuan/llama/eagle_new",
+            "cwd": "${workspaceFolder}",
             "justMyCode": true
         },
         {
@@ -66,20 +62,19 @@
             "request": "launch",
             "module": "eagle.train.mainv2_test_loose_len",
             "args": [
-                "--tmpdir", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/train_data/",
-                "--cpdir", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/checlpoints/",
-                "--basepath", "/net/papilio/storage7/tingyuan/llama/eagle_new/base_model/Meta-Llama-3-8B-Instruct/",
-                "--configpath", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/train/eagle_new-LLaMA3-Instruct-8B.json",
+                "--tmpdir", "${workspaceFolder}/eagle/reflectio/train_data/",
+                "--cpdir", "${workspaceFolder}/eagle/reflectio/checlpoints/",
+                "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
+                "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
                 "--bs", "1"
             ],
             "env": {
-                "PYTHONPATH": "/net/papilio/storage7/tingyuan/llama/eagle_new",
+                "PYTHONPATH": "${workspaceFolder}",
                 "ACCELERATE_LAUNCH": "1",
                 "ACCELERATE_MIXED_PRECISION": "bf16"
             },
-            "cwd": "/net/papilio/storage7/tingyuan/llama/eagle_new",
+            "cwd": "${workspaceFolder}",
             "justMyCode": true
         }
-        
     ]
 }
