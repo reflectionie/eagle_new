@@ -26,7 +26,8 @@
                 "--cpdir", "${workspaceFolder}/eagle/reflectio/checkpoints/",
                 "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
                 "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
-                "--bs", "1"
+                "--bs", "1",
+                "--debug", "True"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
@@ -67,7 +68,8 @@
                 "--cpdir", "${workspaceFolder}/eagle/reflectio/checkpoints/",
                 "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
                 "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
-                "--bs", "1"
+                "--bs", "1",
+                "--debug", "True"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
@@ -76,6 +78,50 @@
             },
             "cwd": "${workspaceFolder}",
             "justMyCode": true
-        }
+        },
+        {
+            "name": "02_03_debug_train_v2_topk",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "eagle.train.mainv2",
+            "args": [
+                "--tmpdir", "${workspaceFolder}/eagle/reflectio/train_data/",
+                "--cpdir", "${workspaceFolder}/eagle/reflectio/checkpoints/",
+                "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
+                "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
+                "--bs", "2",
+                "--debug", "True",
+                "--decision-method", "topk",
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "ACCELERATE_LAUNCH": "1",
+                "ACCELERATE_MIXED_PRECISION": "bf16"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
+        {
+            "name": "02_03_debug_train_v2_topk_semi",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "eagle.train.mainv2",
+            "args": [
+                "--tmpdir", "${workspaceFolder}/eagle/reflectio/train_data/",
+                "--cpdir", "${workspaceFolder}/eagle/reflectio/checkpoints/",
+                "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
+                "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
+                "--bs", "2",
+                "--debug", "True",
+                "--decision-method", "topk_semi",
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "ACCELERATE_LAUNCH": "1",
+                "ACCELERATE_MIXED_PRECISION": "bf16"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
     ]
 }

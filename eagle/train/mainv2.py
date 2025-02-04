@@ -9,7 +9,7 @@ parser.add_argument('--gradient-accumulation-steps', type=int, default=1)
 parser.add_argument('--tmpdir', type=str, default='0')
 parser.add_argument('--cpdir', type=str, default='0')
 parser.add_argument('--wandb-run-name', type=str, default=None)
-parser.add_argument('--decision-method', type=str, default='topk_loose')
+parser.add_argument('--decision-method', type=str, default='topk_loose') # topk topk_semi topk_loose similarity
 parser.add_argument('--sim-threshold', type=float, default=0.9)
 parser.add_argument('--decision-k', type=int, default=10)
 parser.add_argument('--decision-k-sub', type=int, default=5)
@@ -85,7 +85,14 @@ if accelerator.is_main_process:
     from datetime import datetime
 
     # 构造包含年月日和参数的名称
-    run_name = f"{datetime.now().strftime('%Y%m%d_%H%M')}_{args.decision_method}_{args.sim_threshold}_{args.decision_k}_{args.decision_k_sub}"
+    run_name = (
+    f"{datetime.now().strftime('%Y%m%d_%H%M')}_"
+    f"decision_method-{args.decision_method}_"
+    f"sim_threshold-{args.sim_threshold}_"
+    f"decision_k-{args.decision_k}_"
+    f"decision_k_sub-{args.decision_k_sub}"
+    )
+
 
 
     wandb.init(
@@ -405,6 +412,28 @@ def dot_similarity_fn(x, y):
     使用点积作为相似度计算函数。
     """
     return (x * y).sum(dim=1)
+
+
+# =========================
+# semi top‑k 条件判定函数
+# =========================
+def semi_topk_condition(topk_pred: torch.Tensor,
+                         topk_gt: torch.Tensor,
+                         k_sub: int) -> torch.Tensor:
+    """
+    :param topk_pred: [batch_size, k]，模型预测出的 top-k token（有序）
+    :param topk_gt:   [batch_size, k]，目标的 top-k token（有序）
+    :param k_sub:     int，若匹配位置数 >= k_sub 则判定成功
+    :return: condition: [batch_size] 的布尔向量，表示每个样本是否“成功”
+    """
+    # 逐位置比较 => matches: [batch_size, k]，True/False
+    matches = (topk_pred == topk_gt)
+    # 统计“命中”的位置数 => overlap_count: [batch_size]
+    overlap_count = matches.sum(dim=-1)
+    # 判定是否 >= k_sub
+    return overlap_count >= k_sub
+
+
 # =========================
 # 松散 top‑k 条件判定函数
 # =========================
@@ -478,7 +507,7 @@ for epoch in range(num_epochs + 1):
 
             # 从 t=0 开始遍历，通常 t=0 是 <bos> 或者特殊符号，能否替换取决于你的实际需求
             for t in range(0, seq_len):
-                valid_token = data["attention_mask"][:, t].bool()  # [bs]
+                valid_token = data["attention_mask"][:, t].bool() & data["loss_mask"][:, t].bool()  # [bs]
 
                 if train_config['decision_method'] == "topk":
                     logits_t = head(predict_init[:, t, :])   # [bs, vocab_size]
@@ -488,7 +517,14 @@ for epoch in range(num_epochs + 1):
                     # 目标的 top-k
                     topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
                     condition = (topk_pred == topk_gt).all(dim=-1)  # [bs]
-
+                elif train_config['decision_method'] == "topk_semi":
+                    logits_t = head(predict_init[:, t, :])   # [bs, vocab_size]
+                    probs_t = torch.softmax(logits_t, dim=-1)
+                    # 预测的 top-k
+                    topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices  # [bs, k]
+                    # 目标的 top-k
+                    topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
+                    condition = semi_topk_condition(topk_pred, topk_gt, train_config['decision_k_sub'])
                 elif train_config['decision_method'] == "topk_loose":
                     logits_t = head(predict_init[:, t, :])
                     probs_t = torch.softmax(logits_t, dim=-1)
@@ -522,7 +558,7 @@ for epoch in range(num_epochs + 1):
             # 并且 1 表示有效 token，0 表示被 mask 掉的 token。
 
             # 计算每个样本有效 token 的数量（注意这里可能需要转换为 float 以防整型除法）
-            valid_lengths = data["attention_mask"].sum(dim=1).float()  # [bs]
+            valid_lengths = (data["attention_mask"] * data["loss_mask"]).sum(dim=1).float()# [bs]
 
             # 为防止个别样本有效长度为 0 导致除零错误，可以加一个很小的 epsilon
             epsilon = 1e-8
