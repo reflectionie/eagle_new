@@ -23,7 +23,7 @@
             "module": "eagle.train.main",
             "args": [
                 "--tmpdir", "${workspaceFolder}/eagle/reflectio/train_data/",
-                "--cpdir", "${workspaceFolder}/eagle/reflectio/checlpoints/",
+                "--cpdir", "${workspaceFolder}/eagle/reflectio/checkpoints/",
                 "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
                 "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
                 "--bs", "1"
@@ -43,7 +43,7 @@
             "module": "eagle.train.mainv2",
             "args": [
                 "--tmpdir", "${workspaceFolder}/eagle/reflectio/train_data/",
-                "--cpdir", "${workspaceFolder}/eagle/reflectio/checlpoints/",
+                "--cpdir", "${workspaceFolder}/eagle/reflectio/checkpoints/",
                 "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
                 "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
                 "--bs", "2",
@@ -64,7 +64,7 @@
             "module": "eagle.train.mainv2_test_loose_len",
             "args": [
                 "--tmpdir", "${workspaceFolder}/eagle/reflectio/train_data/",
-                "--cpdir", "${workspaceFolder}/eagle/reflectio/checlpoints/",
+                "--cpdir", "${workspaceFolder}/eagle/reflectio/checkpoints/",
                 "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
                 "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
                 "--bs", "1"
