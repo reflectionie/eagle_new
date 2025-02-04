@@ -446,33 +446,29 @@ for epoch in range(num_epochs + 1):
             # 拷贝一份 teacher forcing 的 hidden_states，后续将根据替换策略修改
             modified_hidden_states = data["hidden_states"].clone()
             seq_len = predict_init.shape[1]
-            
-            
-            batch_size = data["hidden_states"].shape[0]
-            # 初始化一个计数器，用于记录每个样本被替换的次数
-            replacement_count = torch.zeros(batch_size, device=data["hidden_states"].device)
 
             # 2. 从最后一个时间步往前判断是否进行替换
             for t in range(seq_len - 1, 0, -1):
-                # 首先，构造一个布尔张量，表示当前位置是否是有效 token
-                # 注意：这里假设 attention_mask 的值为 1 表示有效，否则无效
-                valid_token = data["attention_mask"][:, t].bool()  # [bs]
-
                 if train_config['decision_method'] == "topk":
+                    # 利用 lm_head 解码当前时间步 t 的 hidden state 得到概率分布
                     logits_t = head(predict_init[:, t, :])  # [bs, vocab_size]
                     probs_t = torch.softmax(logits_t, dim=-1)  # [bs, vocab_size]
                     topk_pred = torch.topk(probs_t, train_config['k'], dim=-1).indices  # [bs, k]
                     topk_gt = torch.topk(target_p[:, t, :], train_config['k'], dim=-1).indices  # [bs, k]
+                    # condition 为布尔张量，判断每个样本的 top-k 是否完全一致
                     condition = (topk_pred == topk_gt).all(dim=-1)  # [bs]
                     
                 elif train_config['decision_method'] == "topk_loose":
+                    # (2) 松散 top-k 模式
                     logits_t = head(predict_init[:, t, :])  # [bs, vocab_size]
                     probs_t = torch.softmax(logits_t, dim=-1)  # [bs, vocab_size]
                     topk_pred = torch.topk(probs_t, train_config['k'], dim=-1).indices   # [bs, k]
                     topk_gt = torch.topk(target_p[:, t, :], train_config['k'], dim=-1).indices  # [bs, k]
+                    # 使用松散判定函数，如果 topk_pred 和 topk_gt 的交集大小 >= k_sub，就认为可以替换
                     condition = loose_topk_condition(topk_pred, topk_gt, train_config['k_sub'])
                 
                 elif train_config['decision_method'] == "similarity":
+                    # 使用相似度接口比较模型预测的 hidden state 与 teacher forcing 时的 hidden state
                     pred_hidden_t = predict_init[:, t, :]         # [bs, hidden_dim]
                     gt_hidden_t = data["hidden_states"][:, t, :]    # [bs, hidden_dim]
                     similarity = similarity_fn(pred_hidden_t, gt_hidden_t)  # [bs]
@@ -480,34 +476,16 @@ for epoch in range(num_epochs + 1):
                 else:
                     raise ValueError(f"Unsupported decision_method: {train_config['decision_method']}")
 
-                # 将替换判断限制在有效 token 上：只有同时满足原条件和 token 有效的样本才进行替换
-                condition = condition & valid_token
-
                 if condition.any():
                     # 对满足条件的样本，将用于计算当前时刻 hidden state 的前一步输入（t-1）替换为模型预测的对应 hidden state
                     modified_hidden_states[condition, t-1, :] = predict_init[condition, t-1, :].detach()
-                    # 同时统计替换次数
-                    replacement_count[condition] += 1
-
-            # 假设 data["attention_mask"] 的形状为 [batch_size, seq_len]，
-            # 并且 1 表示有效 token，0 表示被 mask 掉的 token。
-
-            # 计算每个样本有效 token 的数量（注意这里可能需要转换为 float 以防整型除法）
-            valid_lengths = data["attention_mask"].sum(dim=1).float()  # [bs]
-
-            # 为防止个别样本有效长度为 0 导致除零错误，可以加一个很小的 epsilon
-            epsilon = 1e-8
-
-            # 计算每个样本的替换率：替换次数 / 有效 token 数量
-            replacement_rate = replacement_count / (valid_lengths + epsilon)
-
-            # 对整个 batch 取平均，得到平均替换率
-            avg_replacement_rate = replacement_rate.mean().item()
-
-            # 记录到 wandb
-            if accelerator.is_main_process:
-                wandb.log({"avg_replacement_rate": avg_replacement_rate}, step=epoch * len(train_loader) + batch_idx)
-
+                    # 为了让替换后的修改影响后续时间步的预测，重新进行一次不追踪梯度的前向传播
+                    with torch.no_grad():
+                        predict_init = model(
+                            modified_hidden_states,
+                            input_ids=data["input_ids"],
+                            attention_mask=data["attention_mask"]
+                        )
 
             # 3. 最终前向传播（开启梯度跟踪），计算输出用于 loss
             predict = model(
