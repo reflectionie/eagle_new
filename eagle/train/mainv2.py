@@ -85,7 +85,8 @@ if accelerator.is_main_process:
     from datetime import datetime
 
     # 构造包含年月日和参数的名称
-    run_name = f"{datetime.now().strftime('%Y%m%d')}_{args.decision_method}_{args.sim_threshold}_{args.decision_k}_{args.decision_k_sub}"
+    run_name = f"{datetime.now().strftime('%Y%m%d_%H%M')}_{args.decision_method}_{args.sim_threshold}_{args.decision_k}_{args.decision_k_sub}"
+
 
     wandb.init(
         project="SpecAlign", 
