@@ -43,7 +43,7 @@ train_config = {
     "b1": 0.9,
     "b2": 0.95,
     "grad_clip": 0.5,
-    "save_freq": 1,
+    "save_freq": 5,
     # added 
     "decision_method": args.decision_method,
     "sim_threshold": args.sim_threshold,
