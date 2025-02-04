@@ -340,8 +340,10 @@ test_loader = DataLoader(testdataset, batch_size=train_config["bs"], shuffle=Fal
                          collate_fn=DataCollatorWithPadding(), num_workers=train_config["num_workers"], pin_memory=True)
 
 if accelerator.is_main_process:
-    if not os.path.exists(args.cpdir):
-        os.makedirs(args.cpdir)
+    save_dir = os.path.join(args.cpdir, run_name)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
 
 config = EConfig.from_pretrained(train_config["config_path"])
 
@@ -650,4 +652,5 @@ for epoch in range(num_epochs + 1):
             print('Test Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, epoch_loss))
             print('Test Accuracy: {:.2f}%'.format(100 * correct / total))
             wandb.log({"test/epochacc": correct / total, "test/epochloss": epoch_loss})
-            accelerator.save_state(output_dir=f"{args.cpdir}/state_{epoch}")
+            state_output_dir = os.path.join(save_dir, f"state_{epoch}")
+            accelerator.save_state(output_dir=state_output_dir)
