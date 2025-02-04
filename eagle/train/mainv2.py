@@ -13,6 +13,7 @@ parser.add_argument('--decision-method', type=str, default='topk_loose')
 parser.add_argument('--sim-threshold', type=float, default=0.9)
 parser.add_argument('--decision-k', type=int, default=10)
 parser.add_argument('--decision-k-sub', type=int, default=5)
+parser.add_argument('--debug', type=bool, default=False)
 args = parser.parse_args()
 
 train_config = {
@@ -342,20 +343,21 @@ config = EConfig.from_pretrained(train_config["config_path"])
 
 
 ###################################################for debug###################################################
-from model.ea_model import EaModel
-model = EaModel.from_pretrained(
-        base_model_path=args.basepath,
-        ea_model_path="yuhuili/EAGLE-LLaMA3-Instruct-8B",
-        # total_token=63,
-        # depth=5,
-        top_k=10,
-        torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-        # load_in_8bit=True,
-        device_map="auto"
-    )
-head = model.base_model.lm_head
-model = model.ea_layer
+if args.debug:
+    from model.ea_model import EaModel
+    model = EaModel.from_pretrained(
+            base_model_path=args.basepath,
+            ea_model_path="yuhuili/EAGLE-LLaMA3-Instruct-8B",
+            # total_token=63,
+            # depth=5,
+            top_k=10,
+            torch_dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+            # load_in_8bit=True,
+            device_map="auto"
+        )
+    head = model.base_model.lm_head
+    model = model.ea_layer
 ###################################################for debug###################################################
 
 criterion = nn.SmoothL1Loss(reduction="none")
@@ -438,65 +440,71 @@ for epoch in range(num_epochs + 1):
     similarity_fn = default_similarity_fn 
 
     for batch_idx, data in enumerate(tqdm(train_loader)):
-        with accelerator.accumulate(model):
-            optimizer.zero_grad()
-
-            # 1. 初始前向传播（不追踪梯度，用于决策判断）
-            with torch.no_grad():
-                predict_init = model(
-                    data["hidden_states"],
-                    input_ids=data["input_ids"],
-                    attention_mask=data["attention_mask"]
-                )
-                # 仅在 top-k 模式下需要计算 target 的概率分布
+        optimizer.zero_grad()
+        
+        # ----------------------------
+        # 1) 初始前向 (无梯度)，得到全序列的预测
+        # ----------------------------
+        with torch.no_grad():
+            # predict_init: [batch_size, seq_len, hidden_dim] (假设输出是 hidden states)
+            predict_init = model(
+                data["hidden_states"],
+                input_ids=data["input_ids"],
+                attention_mask=data["attention_mask"]
+            )
+            
+            # 如果用 top-k 需要先得到目标分布
+            if train_config["decision_method"] in ("topk", "topk_loose"):
                 target_head = head(data["target"])  # [bs, seq_len, vocab_size]
                 target_p = torch.softmax(target_head, dim=2).detach()
 
-            # 拷贝一份 teacher forcing 的 hidden_states，后续将根据替换策略修改
-            modified_hidden_states = data["hidden_states"].clone()
-            seq_len = predict_init.shape[1]
+        # ----------------------------
+        # 2) 按「左到右」遍历替换
+        # ----------------------------
+        modified_hidden_states = data["hidden_states"].clone()  # 先复制一份
+        batch_size, seq_len, hidden_dim = modified_hidden_states.shape
+        
+        replacement_count = torch.zeros(batch_size, device=data["hidden_states"].device)
+
+        # 从 t=0 开始遍历，通常 t=0 是 <bos> 或者特殊符号，能否替换取决于你的实际需求
+        for t in range(0, seq_len):
+            valid_token = data["attention_mask"][:, t].bool()  # [bs]
+
+            if train_config['decision_method'] == "topk":
+                logits_t = head(predict_init[:, t, :])   # [bs, vocab_size]
+                probs_t = torch.softmax(logits_t, dim=-1)
+                # 预测的 top-k
+                topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices  # [bs, k]
+                # 目标的 top-k
+                topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
+                condition = (topk_pred == topk_gt).all(dim=-1)  # [bs]
+
+            elif train_config['decision_method'] == "topk_loose":
+                logits_t = head(predict_init[:, t, :])
+                probs_t = torch.softmax(logits_t, dim=-1)
+                topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices
+                topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices
+                # loose_topk_condition: 你自定义的宽松对比函数
+                condition = loose_topk_condition(topk_pred, topk_gt, train_config['decision_k_sub'])
+
+            elif train_config['decision_method'] == "similarity":
+                # pred_hidden_t: [bs, hidden_dim]
+                pred_hidden_t = predict_init[:, t, :]
+                # gt_hidden_t:   [bs, hidden_dim]
+                gt_hidden_t = data["hidden_states"][:, t, :]
+                similarity = similarity_fn(pred_hidden_t, gt_hidden_t)  # [bs]
+                condition = similarity > train_config['sim_threshold']
+
+            else:
+                raise ValueError(f"Unsupported decision_method: {train_config['decision_method']}")
+
+            # 只对有效 token 进行替换判断
+            condition = condition & valid_token
             
-            
-            batch_size = data["hidden_states"].shape[0]
-            # 初始化一个计数器，用于记录每个样本被替换的次数
-            replacement_count = torch.zeros(batch_size, device=data["hidden_states"].device)
-
-            # 2. 从最后一个时间步往前判断是否进行替换
-            for t in range(seq_len - 1, 0, -1):
-                # 首先，构造一个布尔张量，表示当前位置是否是有效 token
-                # 注意：这里假设 attention_mask 的值为 1 表示有效，否则无效
-                valid_token = data["attention_mask"][:, t].bool()  # [bs]
-
-                if train_config['decision_method'] == "topk":
-                    logits_t = head(predict_init[:, t, :])  # [bs, vocab_size]
-                    probs_t = torch.softmax(logits_t, dim=-1)  # [bs, vocab_size]
-                    topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices  # [bs, k]
-                    topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
-                    condition = (topk_pred == topk_gt).all(dim=-1)  # [bs]
-                    
-                elif train_config['decision_method'] == "topk_loose":
-                    logits_t = head(predict_init[:, t, :])  # [bs, vocab_size]
-                    probs_t = torch.softmax(logits_t, dim=-1)  # [bs, vocab_size]
-                    topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices   # [bs, k]
-                    topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
-                    condition = loose_topk_condition(topk_pred, topk_gt, train_config['decision_k_sub'])
-                
-                elif train_config['decision_method'] == "similarity":
-                    pred_hidden_t = predict_init[:, t, :]         # [bs, hidden_dim]
-                    gt_hidden_t = data["hidden_states"][:, t, :]    # [bs, hidden_dim]
-                    similarity = similarity_fn(pred_hidden_t, gt_hidden_t)  # [bs]
-                    condition = similarity > train_config['sim_threshold']
-                else:
-                    raise ValueError(f"Unsupported decision_method: {train_config['decision_method']}")
-
-                # 将替换判断限制在有效 token 上：只有同时满足原条件和 token 有效的样本才进行替换
-                condition = condition & valid_token
-
-                if condition.any():
-                    # 对满足条件的样本，将用于计算当前时刻 hidden state 的前一步输入（t-1）替换为模型预测的对应 hidden state
-                    modified_hidden_states[condition, t-1, :] = predict_init[condition, t-1, :].detach()
-                    # 同时统计替换次数
-                    replacement_count[condition] += 1
+            # 若符合替换条件，则把第 t 步的 hidden state 替换成模型自己的预测
+            if condition.any():
+                modified_hidden_states[condition, t, :] = predict_init[condition, t, :].detach()
+                replacement_count[condition] += 1
 
             # 假设 data["attention_mask"] 的形状为 [batch_size, seq_len]，
             # 并且 1 表示有效 token，0 表示被 mask 掉的 token。

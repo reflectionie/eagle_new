@@ -46,7 +46,8 @@
                 "--cpdir", "${workspaceFolder}/eagle/reflectio/checlpoints/",
                 "--basepath", "${workspaceFolder}/base_model/Meta-Llama-3-8B-Instruct/",
                 "--configpath", "${workspaceFolder}/eagle/train/EAGLE-LLaMA3-Instruct-8B.json",
-                "--bs", "2"
+                "--bs", "2",
+                "--debug", "True"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
