@@ -506,13 +506,14 @@ for epoch in range(num_epochs + 1):
                 else:
                     raise ValueError(f"Unsupported decision_method: {train_config['decision_method']}")
 
-                # 只对有效 token 进行替换判断
-                condition = condition & valid_token
-                
-                # 若符合替换条件，则把第 t 步的 hidden state 替换成模型自己的预测
-                if condition.any() and train_config['decision_method'] != "eagle":
-                    modified_hidden_states[condition, t, :] = predict_init[condition, t, :].detach()
-                    replacement_count[condition] += 1
+                if train_config['decision_method'] != "eagle":
+                    # 只对有效 token 进行替换判断
+                    condition = condition & valid_token
+                    
+                    # 若符合替换条件，则把第 t 步的 hidden state 替换成模型自己的预测
+                    if condition.any():
+                        modified_hidden_states[condition, t, :] = predict_init[condition, t, :].detach()
+                        replacement_count[condition] += 1
 
             # 假设 data["attention_mask"] 的形状为 [batch_size, seq_len]，
             # 并且 1 表示有效 token，0 表示被 mask 掉的 token。
