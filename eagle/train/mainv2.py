@@ -532,9 +532,6 @@ for epoch in range(num_epochs + 1):
             # 对整个 batch 取平均，得到平均替换率
             avg_replacement_rate = replacement_rate.mean().item()
 
-            # 记录到 wandb
-            if accelerator.is_main_process:
-                wandb.log({"avg_replacement_rate": avg_replacement_rate}, step=epoch * len(train_loader) + batch_idx)
 
 
         # 3. 最终前向传播（开启梯度跟踪），计算输出用于 loss
@@ -568,8 +565,14 @@ for epoch in range(num_epochs + 1):
             total += ct
             correct += cc
         if accelerator.is_main_process and ct != 0:
-            logdict = {"train/lr": optimizer.optimizer.param_groups[0]["lr"], "train/vloss": vloss.item(),
-                       "train/ploss": ploss.item(), "train/loss": loss.item(), "train/acc": cc / ct}
+            logdict = {
+                    "avg_replacement_rate": avg_replacement_rate,
+                    "train/lr": optimizer.optimizer.param_groups[0]["lr"],
+                    "train/vloss": vloss.item(),
+                    "train/ploss": ploss.item(),
+                    "train/loss": loss.item(),
+                    "train/acc": cc / ct,
+                }
             for id, i in enumerate(top_3acc):
                 logdict[f'train/top_{id + 1}_acc'] = topkacc[id].item() / ct
             wandb.log(logdict)
