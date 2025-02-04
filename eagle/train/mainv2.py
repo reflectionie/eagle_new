@@ -82,12 +82,17 @@ from transformers import get_linear_schedule_with_warmup, AutoConfig
 
 if accelerator.is_main_process:
     import wandb
+    from datetime import datetime
 
-    wandb.init(project="SpecAlign", 
-               entity="reflectionie", 
-               config=train_config,
-               name=args.wandb_run_name
-               )
+    # 构造包含年月日和参数的名称
+    run_name = f"{datetime.now().strftime('%Y%m%d')}_{args.decision_method}_{args.sim_threshold}_{args.decision_k}_{args.decision_k_sub}"
+
+    wandb.init(
+        project="SpecAlign", 
+        entity="reflectionie", 
+        config=train_config,
+        name=run_name
+    )
 
 baseconfig = AutoConfig.from_pretrained(args.basepath)
 
@@ -493,7 +498,8 @@ for epoch in range(num_epochs + 1):
                     gt_hidden_t = data["hidden_states"][:, t, :]
                     similarity = similarity_fn(pred_hidden_t, gt_hidden_t)  # [bs]
                     condition = similarity > train_config['sim_threshold']
-
+                elif train_config['decision_method'] == "eagle":
+                    pass
                 else:
                     raise ValueError(f"Unsupported decision_method: {train_config['decision_method']}")
 
@@ -501,7 +507,7 @@ for epoch in range(num_epochs + 1):
                 condition = condition & valid_token
                 
                 # 若符合替换条件，则把第 t 步的 hidden state 替换成模型自己的预测
-                if condition.any():
+                if condition.any() and train_config['decision_method'] != "eagle":
                     modified_hidden_states[condition, t, :] = predict_init[condition, t, :].detach()
                     replacement_count[condition] += 1
 
@@ -571,10 +577,10 @@ for epoch in range(num_epochs + 1):
     correct, total = correct.sum().item(), total.sum().item()
     epoch_loss /= num_batches
     top_3acc = accelerator.gather_for_metrics(top_3acc)
-    if accelerator.is_local_main_process:
+    if accelerator.is_main_process:
         for id, i in enumerate(top_3acc):
             wandb.log({f'train/epochtop_{id + 1}_acc': i.sum().item() / total})
-    if accelerator.is_local_main_process:
+    if accelerator.is_main_process:
         print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, epoch_loss))
         print('Train Accuracy: {:.2f}%'.format(100 * correct / total))
         wandb.log({"train/epochacc": correct / total, "train/epochloss": epoch_loss})
@@ -623,7 +629,7 @@ for epoch in range(num_epochs + 1):
             mean_acces.append(mean_acc)
 
         mean_acces = accelerator.gather_for_metrics(mean_acces)
-        if accelerator.is_local_main_process:
+        if accelerator.is_main_process:
             for id, i in enumerate(mean_acces):
                 mean_acc = i.mean().item()
                 wandb.log({f"test/{id}_acc": mean_acc})
@@ -632,11 +638,11 @@ for epoch in range(num_epochs + 1):
         correct, total = accelerator.gather_for_metrics((correct, total))
         correct, total = correct.sum().item(), total.sum().item()
         top_3acc = accelerator.gather_for_metrics(top_3acc)
-        if accelerator.is_local_main_process:
+        if accelerator.is_main_process:
             for id, i in enumerate(top_3acc):
                 wandb.log({f'test/top_{id + 1}_acc': i.sum().item() / total})
         epoch_loss /= num_batches
-        if accelerator.is_local_main_process:
+        if accelerator.is_main_process:
             print('Test Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, epoch_loss))
             print('Test Accuracy: {:.2f}%'.format(100 * correct / total))
             wandb.log({"test/epochacc": correct / total, "test/epochloss": epoch_loss})
