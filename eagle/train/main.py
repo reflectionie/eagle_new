@@ -407,7 +407,7 @@ for epoch in range(num_epochs + 1):
         print('Train Accuracy: {:.2f}%'.format(100 * correct / total))
         wandb.log({"train/epochacc": correct / total, "train/epochloss": epoch_loss})
 
-    if (epoch + 1) % train_config["save_freq"]:
+    if (epoch + 1) % train_config["save_freq"] == 0:
         top_3acc = [0 for _ in range(3)]
         correct = 0
         total = 0
@@ -451,7 +451,7 @@ for epoch in range(num_epochs + 1):
             mean_acces.append(mean_acc)
 
         mean_acces = accelerator.gather_for_metrics(mean_acces)
-        if accelerator.is_local_main_process:
+        if accelerator.is_main_process:
             for id, i in enumerate(mean_acces):
                 mean_acc = i.mean().item()
                 wandb.log({f"test/{id}_acc": mean_acc})

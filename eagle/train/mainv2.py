@@ -453,58 +453,57 @@ for epoch in range(num_epochs + 1):
                 attention_mask=data["attention_mask"]
             )
             
-            # 如果用 top-k 需要先得到目标分布
-            if train_config["decision_method"] in ("topk", "topk_loose"):
-                target_head = head(data["target"])  # [bs, seq_len, vocab_size]
-                target_p = torch.softmax(target_head, dim=2).detach()
+           
+            target_head = head(data["target"])  # [bs, seq_len, vocab_size]
+            target_p = torch.softmax(target_head, dim=2).detach()
 
-        # ----------------------------
-        # 2) 按「左到右」遍历替换
-        # ----------------------------
-        modified_hidden_states = data["hidden_states"].clone()  # 先复制一份
-        batch_size, seq_len, hidden_dim = modified_hidden_states.shape
-        
-        replacement_count = torch.zeros(batch_size, device=data["hidden_states"].device)
-
-        # 从 t=0 开始遍历，通常 t=0 是 <bos> 或者特殊符号，能否替换取决于你的实际需求
-        for t in range(0, seq_len):
-            valid_token = data["attention_mask"][:, t].bool()  # [bs]
-
-            if train_config['decision_method'] == "topk":
-                logits_t = head(predict_init[:, t, :])   # [bs, vocab_size]
-                probs_t = torch.softmax(logits_t, dim=-1)
-                # 预测的 top-k
-                topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices  # [bs, k]
-                # 目标的 top-k
-                topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
-                condition = (topk_pred == topk_gt).all(dim=-1)  # [bs]
-
-            elif train_config['decision_method'] == "topk_loose":
-                logits_t = head(predict_init[:, t, :])
-                probs_t = torch.softmax(logits_t, dim=-1)
-                topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices
-                topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices
-                # loose_topk_condition: 你自定义的宽松对比函数
-                condition = loose_topk_condition(topk_pred, topk_gt, train_config['decision_k_sub'])
-
-            elif train_config['decision_method'] == "similarity":
-                # pred_hidden_t: [bs, hidden_dim]
-                pred_hidden_t = predict_init[:, t, :]
-                # gt_hidden_t:   [bs, hidden_dim]
-                gt_hidden_t = data["hidden_states"][:, t, :]
-                similarity = similarity_fn(pred_hidden_t, gt_hidden_t)  # [bs]
-                condition = similarity > train_config['sim_threshold']
-
-            else:
-                raise ValueError(f"Unsupported decision_method: {train_config['decision_method']}")
-
-            # 只对有效 token 进行替换判断
-            condition = condition & valid_token
+            # ----------------------------
+            # 2) 按「左到右」遍历替换
+            # ----------------------------
+            modified_hidden_states = data["hidden_states"].clone()  # 先复制一份
+            batch_size, seq_len, hidden_dim = modified_hidden_states.shape
             
-            # 若符合替换条件，则把第 t 步的 hidden state 替换成模型自己的预测
-            if condition.any():
-                modified_hidden_states[condition, t, :] = predict_init[condition, t, :].detach()
-                replacement_count[condition] += 1
+            replacement_count = torch.zeros(batch_size, device=data["hidden_states"].device)
+
+            # 从 t=0 开始遍历，通常 t=0 是 <bos> 或者特殊符号，能否替换取决于你的实际需求
+            for t in range(0, seq_len):
+                valid_token = data["attention_mask"][:, t].bool()  # [bs]
+
+                if train_config['decision_method'] == "topk":
+                    logits_t = head(predict_init[:, t, :])   # [bs, vocab_size]
+                    probs_t = torch.softmax(logits_t, dim=-1)
+                    # 预测的 top-k
+                    topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices  # [bs, k]
+                    # 目标的 top-k
+                    topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
+                    condition = (topk_pred == topk_gt).all(dim=-1)  # [bs]
+
+                elif train_config['decision_method'] == "topk_loose":
+                    logits_t = head(predict_init[:, t, :])
+                    probs_t = torch.softmax(logits_t, dim=-1)
+                    topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices
+                    topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices
+                    # loose_topk_condition: 你自定义的宽松对比函数
+                    condition = loose_topk_condition(topk_pred, topk_gt, train_config['decision_k_sub'])
+
+                elif train_config['decision_method'] == "similarity":
+                    # pred_hidden_t: [bs, hidden_dim]
+                    pred_hidden_t = predict_init[:, t, :]
+                    # gt_hidden_t:   [bs, hidden_dim]
+                    gt_hidden_t = data["hidden_states"][:, t, :]
+                    similarity = similarity_fn(pred_hidden_t, gt_hidden_t)  # [bs]
+                    condition = similarity > train_config['sim_threshold']
+
+                else:
+                    raise ValueError(f"Unsupported decision_method: {train_config['decision_method']}")
+
+                # 只对有效 token 进行替换判断
+                condition = condition & valid_token
+                
+                # 若符合替换条件，则把第 t 步的 hidden state 替换成模型自己的预测
+                if condition.any():
+                    modified_hidden_states[condition, t, :] = predict_init[condition, t, :].detach()
+                    replacement_count[condition] += 1
 
             # 假设 data["attention_mask"] 的形状为 [batch_size, seq_len]，
             # 并且 1 表示有效 token，0 表示被 mask 掉的 token。
@@ -526,23 +525,23 @@ for epoch in range(num_epochs + 1):
                 wandb.log({"avg_replacement_rate": avg_replacement_rate}, step=epoch * len(train_loader) + batch_idx)
 
 
-            # 3. 最终前向传播（开启梯度跟踪），计算输出用于 loss
-            predict = model(
-                modified_hidden_states,
-                input_ids=data["input_ids"],
-                attention_mask=data["attention_mask"]
-            )
+        # 3. 最终前向传播（开启梯度跟踪），计算输出用于 loss
+        predict = model(
+            modified_hidden_states,
+            input_ids=data["input_ids"],
+            attention_mask=data["attention_mask"]
+        )
 
-            # 计算损失（这里 compute_loss 中对 predict 和 target 进行匹配）
-            loss_mask = data["loss_mask"][:, :, None]
-            vloss, ploss, out_head = compute_loss(data["target"], target_p, predict, loss_mask)
-            loss = train_config["v_w"] * vloss + train_config["p_w"] * ploss
+        # 计算损失（这里 compute_loss 中对 predict 和 target 进行匹配）
+        loss_mask = data["loss_mask"][:, :, None]
+        vloss, ploss, out_head = compute_loss(data["target"], target_p, predict, loss_mask)
+        loss = train_config["v_w"] * vloss + train_config["p_w"] * ploss
 
-            accelerator.backward(loss)
-            accelerator.clip_grad_value_(model.parameters(), train_config["grad_clip"])
-            optimizer.step()
-            if is_warmup:
-                scheduler.step()
+        accelerator.backward(loss)
+        accelerator.clip_grad_value_(model.parameters(), train_config["grad_clip"])
+        optimizer.step()
+        if is_warmup:
+            scheduler.step()
 
         with torch.no_grad():
             _, predicted = torch.max(out_head, 2)
@@ -580,7 +579,7 @@ for epoch in range(num_epochs + 1):
         print('Train Accuracy: {:.2f}%'.format(100 * correct / total))
         wandb.log({"train/epochacc": correct / total, "train/epochloss": epoch_loss})
 
-    if (epoch + 1) % train_config["save_freq"]:
+    if (epoch + 1) % train_config["save_freq"] == 0:
         top_3acc = [0 for _ in range(3)]
         correct = 0
         total = 0
