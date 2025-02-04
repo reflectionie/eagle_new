@@ -8,6 +8,11 @@ parser.add_argument('--bs', type=int, default=4)
 parser.add_argument('--gradient-accumulation-steps', type=int, default=1)
 parser.add_argument('--tmpdir', type=str, default='0')
 parser.add_argument('--cpdir', type=str, default='0')
+parser.add_argument('--wandb-run-name', type=str, default=None)
+parser.add_argument('--decision-method', type=str, default='topk_loose')
+parser.add_argument('--sim-threshold', type=float, default=0.9)
+parser.add_argument('--decision-k', type=int, default=10)
+parser.add_argument('--decision-k-sub', type=int, default=5)
 args = parser.parse_args()
 
 train_config = {
@@ -39,10 +44,10 @@ train_config = {
     "grad_clip": 0.5,
     "save_freq": 5,
     # added 
-    "decision_method": "topk_loose",
-    "sim_threshold": 0.9,
-    "k": 10,
-    "k_sub": 5
+    "decision_method": args.decision_method,
+    "sim_threshold": args.sim_threshold,
+    "decision_k": args.decision_k,
+    "decision_k_sub": args.decision_k_sub
 }
 
 
@@ -77,7 +82,11 @@ from transformers import get_linear_schedule_with_warmup, AutoConfig
 if accelerator.is_main_process:
     import wandb
 
-    wandb.init(project="SpecAlign", entity="reflectionie", config=train_config)
+    wandb.init(project="SpecAlign", 
+               entity="reflectionie", 
+               config=train_config,
+               name=args.wandb_run_name
+               )
 
 baseconfig = AutoConfig.from_pretrained(args.basepath)
 
@@ -461,16 +470,16 @@ for epoch in range(num_epochs + 1):
                 if train_config['decision_method'] == "topk":
                     logits_t = head(predict_init[:, t, :])  # [bs, vocab_size]
                     probs_t = torch.softmax(logits_t, dim=-1)  # [bs, vocab_size]
-                    topk_pred = torch.topk(probs_t, train_config['k'], dim=-1).indices  # [bs, k]
-                    topk_gt = torch.topk(target_p[:, t, :], train_config['k'], dim=-1).indices  # [bs, k]
+                    topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices  # [bs, k]
+                    topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
                     condition = (topk_pred == topk_gt).all(dim=-1)  # [bs]
                     
                 elif train_config['decision_method'] == "topk_loose":
                     logits_t = head(predict_init[:, t, :])  # [bs, vocab_size]
                     probs_t = torch.softmax(logits_t, dim=-1)  # [bs, vocab_size]
-                    topk_pred = torch.topk(probs_t, train_config['k'], dim=-1).indices   # [bs, k]
-                    topk_gt = torch.topk(target_p[:, t, :], train_config['k'], dim=-1).indices  # [bs, k]
-                    condition = loose_topk_condition(topk_pred, topk_gt, train_config['k_sub'])
+                    topk_pred = torch.topk(probs_t, train_config['decision_k'], dim=-1).indices   # [bs, k]
+                    topk_gt = torch.topk(target_p[:, t, :], train_config['decision_k'], dim=-1).indices  # [bs, k]
+                    condition = loose_topk_condition(topk_pred, topk_gt, train_config['decision_k_sub'])
                 
                 elif train_config['decision_method'] == "similarity":
                     pred_hidden_t = predict_init[:, t, :]         # [bs, hidden_dim]

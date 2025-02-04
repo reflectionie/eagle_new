@@ -8,6 +8,7 @@ parser.add_argument('--bs', type=int, default=4)
 parser.add_argument('--gradient-accumulation-steps', type=int, default=1)
 parser.add_argument('--tmpdir', type=str, default='0')
 parser.add_argument('--cpdir', type=str, default='0')
+parser.add_argument('--wandb-run-name', type=str, default=None)
 args = parser.parse_args()
 
 train_config = {
@@ -67,7 +68,11 @@ from transformers import get_linear_schedule_with_warmup, AutoConfig
 if accelerator.is_main_process:
     import wandb
 
-    wandb.init(project="SpecAlign", entity="reflectionie", config=train_config)
+    wandb.init(project="SpecAlign", 
+               entity="reflectionie", 
+               config=train_config,
+               name=args.wandb_run_name
+               )
 
 baseconfig = AutoConfig.from_pretrained(args.basepath)
 
