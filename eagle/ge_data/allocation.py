@@ -8,9 +8,9 @@ args = parser.parse_args()
 import os
 from concurrent.futures import ThreadPoolExecutor
 
-s = 0
-# e = 68000 - 1
-e = 300
+s = 50057
+e = 68000 - 1
+# e = 300
 #e = 68 - 1
 #gpus = [[0],[1],[2],[3],[4],[5],[6],[7]]
 

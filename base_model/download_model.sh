@@ -20,7 +20,7 @@
 # huggingface-cli download --token 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 --resume-download WeOpenML/PandaLM-7B-v1 --local-dir PandaLM-7B-v1
 
 # export HF_ENDPOINT=https://hf-mirror.com
-huggingface-cli download --token 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 --resume-download meta-llama/Meta-Llama-3-8B-Instruct --local-dir eta-Llama-3-8B-Instruct
+huggingface-cli download --token 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 --resume-download meta-llama/Meta-Llama-3-8B-Instruct --local-dir Meta-Llama-3-8B-Instruct
 
 # export HF_ENDPOINT=https://hf-mirror.com
 # huggingface-cli download --token 你的token --resume-download huggingface模型路径 --local-dir 本地路径
