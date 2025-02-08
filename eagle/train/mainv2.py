@@ -13,6 +13,7 @@ parser.add_argument('--decision-method', type=str, default='topk_loose') # topk 
 parser.add_argument('--sim-threshold', type=float, default=0.9)
 parser.add_argument('--decision-k', type=int, default=10)
 parser.add_argument('--decision-k-sub', type=int, default=5)
+parser.add_argument('--ckpt_path', type=str, default=None)
 parser.add_argument('--debug', type=bool, default=False)
 args = parser.parse_args()
 
@@ -357,6 +358,7 @@ config = EConfig.from_pretrained(train_config["config_path"])
 
 
 
+
 ###################################################for debug###################################################
 if args.debug:
     from model.ea_model import EaModel
@@ -376,6 +378,19 @@ if args.debug:
 ###################################################for debug###################################################
 else:
     model = Model(config, load_emb=True, path=args.basepath)
+    
+    
+#################for train from ckpt #################
+if args.ckpt_path is not None: 
+    ea_model_path = args.ckpt_path
+    load_model_path=os.path.join(ea_model_path, "pytorch_model.bin")
+    if os.path.exists(load_model_path):
+        ea_layer_state_dict = torch.load(load_model_path, map_location="cuda")
+    else:
+        load_model_path = os.path.join(ea_model_path, "model.safetensors")
+        ea_layer_state_dict = safetensors.torch.load_file(load_model_path)
+######################################################
+
 
 
 criterion = nn.SmoothL1Loss(reduction="none")
