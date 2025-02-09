@@ -16,7 +16,7 @@ PYTHONPATH=. ACCELERATE_MIXED_PRECISION=bf16 accelerate launch \
   --configpath ./eagle/train/EAGLE-LLaMA3-Instruct-8B.json \
   --decision-method topk \
   --decision-k 5 \
-  --bs 6 \
+  --bs 4 \
   --ckpt_path /home/5/uu02155/data/llama/hass_new/reflectio/li/EAGLE-LLaMA3-Instruct-8B \
   --lr 0.00001
 
@@ -36,7 +36,7 @@ PYTHONPATH=. ACCELERATE_MIXED_PRECISION=bf16 accelerate launch \
   --configpath ./eagle/train/EAGLE-LLaMA3-Instruct-8B.json \
   --decision-method topk \
   --decision-k 10 \
-  --bs 6 \
+  --bs 4 \
   --ckpt_path /home/5/uu02155/data/llama/hass_new/reflectio/li/EAGLE-LLaMA3-Instruct-8B \
   --lr 0.00001
 
