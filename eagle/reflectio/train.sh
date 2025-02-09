@@ -42,3 +42,13 @@ PYTHONPATH=. ACCELERATE_MIXED_PRECISION=bf16 accelerate launch --multi_gpu --num
 # 9. --decision-method为topk_loose，--decision-k为10，--decision-k-sub为1
 PYTHONPATH=. ACCELERATE_MIXED_PRECISION=bf16 accelerate launch --multi_gpu --num_processes 4 --mixed_precision bf16 -m eagle.train.mainv2 --tmpdir ./eagle/reflectio/train_data/ --cpdir ./eagle/reflectio/checkpoints/ --basepath ./base_model/Meta-Llama-3-8B-Instruct/ --configpath ./eagle/train/EAGLE-LLaMA3-Instruct-8B.json --decision-method topk_loose --decision-k 10 --decision-k-sub 1 --bs 6
 
+
+
+
+#####################################train again###################0209
+
+PYTHONPATH=. ACCELERATE_MIXED_PRECISION=bf16 accelerate launch --multi_gpu --num_processes 4 --mixed_precision bf16 -m eagle.train.mainv2 --tmpdir ./eagle/reflectio/train_data/ --cpdir ./eagle/reflectio/checkpoints/ --basepath ./base_model/Meta-Llama-3-8B-Instruct/ --configpath ./eagle/train/EAGLE-LLaMA3-Instruct-8B.json --decision-method eagle --bs 6 --ckpt_path /home/5/uu02155/data/llama/hass_new/reflectio/li/EAGLE-LLaMA3-Instruct-8B
+
+PYTHONPATH=. ACCELERATE_MIXED_PRECISION=bf16 accelerate launch --multi_gpu --num_processes 4 --mixed_precision bf16 -m eagle.train.mainv2 --tmpdir ./eagle/reflectio/train_data/ --cpdir ./eagle/reflectio/checkpoints/ --basepath ./base_model/Meta-Llama-3-8B-Instruct/ --configpath ./eagle/train/EAGLE-LLaMA3-Instruct-8B.json --decision-method topk --decision-k 5 --bs 6 --ckpt_path /home/5/uu02155/data/llama/hass_new/reflectio/li/EAGLE-LLaMA3-Instruct-8B
+
+PYTHONPATH=. ACCELERATE_MIXED_PRECISION=bf16 accelerate launch --multi_gpu --num_processes 4 --mixed_precision bf16 -m eagle.train.mainv2 --tmpdir ./eagle/reflectio/train_data/ --cpdir ./eagle/reflectio/checkpoints/ --basepath ./base_model/Meta-Llama-3-8B-Instruct/ --configpath ./eagle/train/EAGLE-LLaMA3-Instruct-8B.json --decision-method topk --decision-k 10 --bs 6 --ckpt_path /home/5/uu02155/data/llama/hass_new/reflectio/li/EAGLE-LLaMA3-Instruct-8B
