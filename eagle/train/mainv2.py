@@ -389,6 +389,15 @@ if args.ckpt_path is not None:
     else:
         load_model_path = os.path.join(ea_model_path, "model.safetensors")
         ea_layer_state_dict = safetensors.torch.load_file(load_model_path)
+
+
+    # 打印当前模型的keys
+    print("Current model keys:", model.state_dict().keys())
+
+    # 打印预训练模型的keys
+    print("Pretrained keys:", ea_layer_state_dict.keys())
+    model.load_state_dict(ea_layer_state_dict, strict=True)
+    print(f"load model from {load_model_path}")
 ######################################################
 
 
