@@ -23,7 +23,7 @@ train_config = {
     "gradient_accumulation_steps": args.gradient_accumulation_steps,
     "datapath": f"{args.tmpdir}",
     "is_warmup": True,
-    "num_epochs": 20,
+    "num_epochs": 15,
     # Depending on your data and model size, the larger the model, the higher the sample efficiency. We recommend setting it between 20-40.
     "num_warmup_steps": 2000,
     "total_steps": 800000,
@@ -380,7 +380,7 @@ else:
     model = Model(config, load_emb=True, path=args.basepath)
     
     
-#################for train from ckpt #################
+#################for train from ckpt #########################################
 if args.ckpt_path is not None: 
     ea_model_path = args.ckpt_path
     load_model_path=os.path.join(ea_model_path, "pytorch_model.bin")
@@ -398,7 +398,7 @@ if args.ckpt_path is not None:
     print("Pretrained keys:", ea_layer_state_dict.keys())
     model.load_state_dict(ea_layer_state_dict, strict=True)
     print(f"load model from {load_model_path}")
-######################################################
+########################################################################################
 
 
 
