@@ -1,4 +1,9 @@
 # multi_gpu_run.py
+"""
+PYTHONPATH=. python -m eagle.ge_data.diff_multi_gpu --ckpt_dir /net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/train_data --ckpt_path_ea_model /net/graphium/storage3/tingyuan/models/EAGLE-LLaMA3-Instruct-8B/
+
+PYTHONPATH=. python -m eagle.ge_data.diff_multi_gpu --ckpt_dir /home/5/uu02155/data/llama/eagle_new/eagle/reflectio/train_data   --ckpt_path_ea_model /home/5/uu02155/data/llama/HASS/refl/li/EAGLE-LLaMA3-Instruct-8B --num_gpus 4
+"""
 import os
 import math
 import argparse
