@@ -167,6 +167,7 @@ wandb
 eagle/reflectio/checkpoints/*
 eagle/reflectio/train_data/*
 eagle/reflectio/ShareGPT_V4.3_unfiltered_cleaned_split.json
-
 eagle/reflectio/debug_data/*
+
+eagle/reflectio/draft_train_data/*
 eagle/reflectio/cp_debug_data.sh
