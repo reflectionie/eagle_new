@@ -68,6 +68,16 @@ class EaModel(nn.Module):
         self.ea_layer.load_state_dict(ea_layer_state_dict, strict=True)
         self.ea_layer.to(self.base_model.dtype).to(device)
         self.ea_layer.init_tree()
+        
+    def train(self, mode: bool = True):
+        # 设置ea_layer为训练模式
+        self.ea_layer.train(mode)
+        # 显式冻结 base_model 中的参数
+        for name, param in self.base_model.named_parameters():
+            param.requires_grad = False
+        return self
+
+        
 
     def get_tokenizer(self):
         """Get the tokenizer of the base model.
@@ -160,6 +170,91 @@ class EaModel(nn.Module):
 
         return model
 
+    @classmethod
+    def from_pretrained_w_base_model(
+            cls,
+            Type="LLaMA",
+            base_model_path=None,
+            ea_model_path=None,
+            total_token=59,
+            depth=5,
+            top_k=10,
+            threshold=1.0,
+            **kwargs,
+    ):
+        #assert Type=="LLaMA" or "Mixtral"
+        base_model = kwargs['base_model']
+        # Type=AutoConfig.from_pretrained(base_model_path).architectures[0]
+        # if Type=='LlamaForCausalLM':
+        #     base_model = KVLlamaForCausalLM.from_pretrained(
+        #         base_model_path, **kwargs
+        #     )
+        # elif Type=='Qwen2ForCausalLM':
+        #     base_model=KVQwen2ForCausalLM.from_pretrained(
+        #         base_model_path, **kwargs
+        #     )
+        # else:
+        #     base_model = KVMixtralForCausalLM.from_pretrained(
+        #         base_model_path, **kwargs
+        #     )
+
+        configpath=os.path.join(ea_model_path,"config.json")
+        if not os.path.exists(configpath):
+            configpath = hf_hub_download(ea_model_path, "config.json")
+
+        try:
+            load_model_path=os.path.join(ea_model_path, "pytorch_model.bin")
+            if not os.path.exists(load_model_path):
+                load_model_path=hf_hub_download(ea_model_path, "pytorch_model.bin")
+            ea_layer_state_dict = torch.load(load_model_path,
+                                             map_location=base_model.device)
+        except:
+            from safetensors.torch import load_file
+            load_model_path = os.path.join(ea_model_path, "model.safetensors")
+            if not os.path.exists(load_model_path):
+                load_model_path = hf_hub_download(ea_model_path, "model.safetensors")
+            ea_layer_state_dict = load_file(load_model_path)
+        model = cls(
+            base_model,
+            base_model_path,
+            configpath,
+            total_token,
+            depth,
+            top_k,
+            threshold,
+            ea_layer_state_dict
+        )
+
+
+
+        if total_token==-1:
+            device = model.base_model.model.layers[0].self_attn.q_proj.weight.device
+            cans=[40,48,50,56,60]
+            x=[1,1.05,1.07,1.1,1.13]
+            times=[]
+
+            for i in range(len(cans)):
+                length = cans[i]
+                input_ids = torch.randint(0, model.config.vocab_size - 200, (1, length)).to(device)
+                torch.cuda.synchronize()
+                start_time = time.time()
+                for _ in range(20):
+                    torch.cuda.synchronize()
+                    with torch.no_grad():
+                        outputs = model.base_model(input_ids)
+                    torch.cuda.synchronize()
+                torch.cuda.synchronize()
+                end_time = time.time()
+                times.append((end_time - start_time) / x[i])
+            total_token=cans[times.index(min(times))]
+            model.ea_layer.total_tokens=total_token-1
+
+
+
+
+        return model
+    
+    
     def forward(
             self,
             input_ids=None,

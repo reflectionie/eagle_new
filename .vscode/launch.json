@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "02_02_ge_data",
             "type": "debugpy",
@@ -160,6 +161,7 @@
             "env": {
               "PYTHONPATH": "."
             },
+            "justMyCode": false
           }
     ]
 }
