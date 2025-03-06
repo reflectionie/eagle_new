@@ -123,5 +123,43 @@
             "cwd": "${workspaceFolder}",
             "justMyCode": true
         },
+        {
+            "name": "Debug eagle_prefix_infer.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/eaglerl/eagle_prefix_infer.py",
+            "env": {
+              "PYTHONPATH": "."
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug ppo_accept_length_train.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/eaglerl/ppo_accept_length_train.py",
+            "args": [
+              "--base-model-path", "/net/papilio/storage7/tingyuan/llama/eagle_new/base_model/Meta-Llama-3-8B-Instruct",
+              "--ea-model-path", "/net/graphium/storage3/tingyuan/models/EAGLE-LLaMA3-Instruct-8B",
+              "--datapath", "/net/papilio/storage7/tingyuan/llama/eagle_new/eagle/reflectio/train_data/eagle_data/sharegpt_0_300_mufp16",
+              "--max_new_tokens", "50",
+              "--temperature", "0.0",
+              "--device", "cuda",
+              "--dtype", "float16",
+              "--output_dir", "./ppo_output",
+              "--learning_rate", "3e-6",
+              "--per_device_train_batch_size", "1",
+              "--gradient_accumulation_steps", "16",
+              "--total_episodes", "10000",
+              "--sft_model_path", "/net/graphium/storage3/tingyuan/models/EAGLE-LLaMA3-Instruct-8B",
+              "--reward_model_path", "/net/graphium/storage3/tingyuan/models/EAGLE-LLaMA3-Instruct-8B",
+              "--dataset_name", "sharedgpt"
+              // 可以在这里继续添加其他 PPO/训练参数
+            ],
+            "console": "integratedTerminal",
+            "env": {
+              "PYTHONPATH": "."
+            },
+          }
     ]
 }
