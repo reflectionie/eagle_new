@@ -11,6 +11,27 @@ from trl.core import masked_mean, masked_whiten
 
 INVALID_LOGPROB = 1.0
 class EaglePPOTrainer(PPOTrainer):
+    
+    def get_accept_length_reward(
+        reward_model,  # 您的 AcceptLengthRewardModel 实例
+        postprocessed_query_response: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        用 reward_model.forward(...) 计算出 batch 维度的 accept_length
+        返回 (dummy_logits, rewards, seq_lengths) 三者
+        - dummy_logits: 只是占位，为了兼容 PPO 内部结构，可返回0即可
+        - rewards: shape [batch_size]，即每条样本的 accept_length
+        - seq_lengths: 同样可有可无，如果不需要也可返回0
+        """
+        with torch.no_grad():
+            # 假设reward_model的forward至少支持: forward(input_ids=..., loss_mask=...) 
+            # 如果您里面不需要loss_mask，可以传 None 或构造全1 mask
+            dummy_logits, rewards, seq_lengths = reward_model(
+                input_ids=postprocessed_query_response,
+                loss_mask=None,  # 或者全1张量
+            )
+        return dummy_logits, rewards, seq_lengths
+
     def train(self):
         args = self.args
         accelerator = self.accelerator
@@ -134,9 +155,13 @@ class EaglePPOTrainer(PPOTrainer):
                         unwrapped_value_model, query_response, processing_class.pad_token_id, context_length
                     )
                     value = full_value[:, context_length - 1 : -1].squeeze(-1)
-                    _, score, _ = get_reward(
-                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
-                    )
+                    # _, score, _ = get_reward(
+                    #     reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
+                    # )
+                    dummy_logits, score, seq_lengths = self.get_accept_length_reward(
+                    reward_model,  # 也就是您的 AcceptLengthRewardModel
+                    postprocessed_query_response
+)
 
                     responses.append(response)
                     postprocessed_responses.append(postprocessed_response)
