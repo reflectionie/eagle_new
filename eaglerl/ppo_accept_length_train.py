@@ -288,8 +288,8 @@ def main():
         ref_policy = None
 
     # 5. PPOTrainer, 重点: model=..., value_model=..., 传同一个对象
-    from trl import PPOTrainer
-    trainer = PPOTrainer(
+    from eagle_ppo_trainer import EaglePPOTrainer
+    trainer = EaglePPOTrainer(
         args=training_args,
         processing_class=tokenizer,
         model=model,                # policy
