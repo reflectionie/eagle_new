@@ -5,7 +5,7 @@ import torch
 from transformers import GenerationConfig
 from trl import PPOTrainer
 from trl.models.utils import unwrap_model_for_generation
-from trl.trainer.utils import batch_generation, selective_log_softmax
+from trl.trainer.utils import batch_generation, selective_log_softmax, forward, get_reward, truncate_response, first_true_indices
 from trl.core import masked_mean, masked_whiten
 
 
