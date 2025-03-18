@@ -135,16 +135,23 @@ from transformers.modeling_outputs import BaseModelOutput
 from eagle.model.ea_model_rl import EaModel
 
 class EaModelWithValueHead(EaModel):
+    # 保证 PPOTrainer 能通过 value_model.base_model_prefix 访问到骨干网络
     base_model_prefix = "base_model"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.value_head = nn.Linear(self.hidden_size, 1)
+        # 无论 base_model 有没有 generation_config，总是手动创建一个
+        self.generation_config = type("DummyGenConfig", (), {})()
+        eos_id = self.get_tokenizer().eos_token_id
+        if eos_id is None:
+            eos_id = 2
+        self.generation_config.eos_token_id = eos_id
 
     @classmethod
     def from_pretrained(cls, base_model_path, ea_model_path, total_token=60, depth=5, top_k=10,
                         threshold=1.0, torch_dtype=None, device_map="auto", low_cpu_mem_usage=True, **kwargs):
-        base_ea_model = super().from_pretrained(
+        base_ea_model = super(EaModelWithValueHead, cls).from_pretrained(
             base_model_path=base_model_path,
             ea_model_path=ea_model_path,
             total_token=total_token,
@@ -159,21 +166,36 @@ class EaModelWithValueHead(EaModel):
         new_obj = cls.__new__(cls)
         new_obj.__dict__ = base_ea_model.__dict__
         new_obj.value_head = nn.Linear(new_obj.hidden_size, 1)
+        # 无条件设置 generation_config
+        new_obj.generation_config = type("DummyGenConfig", (), {})()
+        eos_id = new_obj.get_tokenizer().eos_token_id
+        if eos_id is None:
+            eos_id = 2
+        new_obj.generation_config.eos_token_id = eos_id
         return new_obj
 
     def forward(self, input_ids=None, attention_mask=None, **kwargs):
-        # EaModel父类 => return (outputs, hidden_states)
         outputs, hidden_states = super().forward(input_ids, attention_mask, **kwargs)
-        # 返回HF风格BaseModelOutput
+        # 返回 HF 风格 BaseModelOutput，使得 PPOTrainer 能够取出 hidden_states
         return BaseModelOutput(
             last_hidden_state=hidden_states,
-            hidden_states=[hidden_states],
+            hidden_states=[hidden_states]
         )
 
     def score(self, last_hidden_states: torch.Tensor) -> torch.Tensor:
         if last_hidden_states.dim() == 3:
             last_hidden_states = last_hidden_states[:, -1, :]
         return self.value_head(last_hidden_states)
+
+    def get_policy_output(self, input_ids, attention_mask=None):
+        self.eval()
+        with torch.no_grad():
+            outs, hidden_states = super().forward(input_ids, attention_mask=attention_mask)
+            logits = self.base_model.lm_head(hidden_states)
+        return logits
+
+    def generate(self, input_ids, attention_mask=None, **kwargs):
+        return self.base_model.generate(input_ids, attention_mask=attention_mask, **kwargs)
 
 
 # ------------------------
@@ -261,19 +283,19 @@ def main():
 
     # 5) PPOTrainer
     #   policy与value都用同一个 model，避免多份权重
-    trainer = PPOTrainer(
+    from eagle_ppo_trainer import EaglePPOTrainer
+    trainer = EaglePPOTrainer(
         args=training_args,
         processing_class=tokenizer,
-        model=model,
-        ref_model=ref_policy,
+        model=model,            # 单模型：forward 返回 {"logits", "value"}
+        ref_model=ref_policy,   # 用于 KL 对比
         reward_model=reward_model,
-        value_model=model,
+        value_model=model,      # 传同一个对象，确保共享权重
         train_dataset=dataset,
         eval_dataset=None,
         peft_config=peft_config,
-        data_collator=data_collator,
+        data_collator=data_collator
     )
-
     # 6) 训练
     trainer.train()
 
